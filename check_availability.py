@@ -1,5 +1,7 @@
+import json
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import requests
 
@@ -10,6 +12,46 @@ URL = f"https://clubspark.lta.org.uk/v0/VenueBooking/FinsburyPark/GetVenueSessio
 # Pushover credentials (set these as environment variables)
 PUSHOVER_USER_KEY = "***REMOVED***"
 PUSHOVER_API_TOKEN = "***REMOVED***"
+
+
+# --- State Management ---
+STATE_FILE = Path(__file__).parent / "availability_state.json"
+
+
+def load_previous_state():
+    """Load the previous availability state from file."""
+    if STATE_FILE.exists():
+        try:
+            with open(STATE_FILE, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load previous state: {e}")
+            return {}
+    return {}
+
+
+def save_current_state(availability_data):
+    """Save the current availability state to file."""
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump(availability_data, f, indent=2)
+    except Exception as e:
+        print(f"Warning: Could not save state: {e}")
+
+
+def get_new_slots(current_availability, previous_availability):
+    """
+    Compare current and previous availability to find new slots.
+    Returns a list of only the newly available slots.
+    """
+    new_slots = []
+
+    for court_result in current_availability:
+        # Check if this exact result was in the previous state
+        if court_result not in previous_availability:
+            new_slots.append(court_result)
+
+    return new_slots
 
 
 # --- Helpers ---
@@ -72,6 +114,9 @@ def send_pushover_notification(message, title="Tennis Court Availability"):
 
 # --- Main ---
 def check_availability():
+    # Load previous state
+    previous_availability = load_previous_state().get("availability", [])
+
     r = requests.get(URL)
     data = r.json()
 
@@ -79,7 +124,7 @@ def check_availability():
     latest = data["LatestEndTime"]
     min_interval = data["MinimumInterval"]
 
-    availability_found = []
+    current_availability = []
 
     for resource in data["Resources"]:
         court_name = resource["Name"]
@@ -99,11 +144,27 @@ def check_availability():
             ]
             result = f"{court_name}: {', '.join(human_slots)}"
             print(result)
-            availability_found.append(result)
+            current_availability.append(result)
 
-    if availability_found:
-        message = f"Courts available on {DATE}:\n\n" + "\n".join(availability_found)
+    # Check for new availability
+    new_slots = get_new_slots(current_availability, previous_availability)
+
+    if new_slots:
+        print(f"\n🎾 {len(new_slots)} new slot(s) detected!")
+        message = f"New courts available on {DATE}:\n\n" + "\n".join(new_slots)
         send_pushover_notification(message)
+    elif current_availability:
+        print("\n✓ All slots were already known (no notification sent)")
+    else:
+        print("\n✗ No availability found")
+
+    # Save current state for next run
+    save_current_state(
+        {
+            "availability": current_availability,
+            "last_checked": datetime.now().isoformat(),
+        }
+    )
 
 
 if __name__ == "__main__":

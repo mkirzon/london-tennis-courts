@@ -1,0 +1,13 @@
+{
+  "availability": [
+    "Court 1: 7am\u20138am, 9pm\u201310pm",
+    "Court 2: 7am\u20138am, 9pm\u201310pm",
+    "Court 3: 7am\u20138am, 4pm\u20135pm, 8pm\u201310pm",
+    "Court 4 (no floodlights): 7am\u20138am",
+    "Court 5 (no floodlights): 7am\u20139am",
+    "Court 6: 7am\u20139am, 8pm\u201310pm",
+    "Court 7: 8pm\u201310pm",
+    "Court 8: 9pm\u201310pm"
+  ],
+  "last_checked": "2025-10-20T19:03:23.938746"
+}
