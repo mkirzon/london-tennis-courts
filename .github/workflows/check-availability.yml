@@ -4,7 +4,26 @@ on:
   schedule:
     # Run every 15 minutes
     - cron: '*/15 * * * *'
-  workflow_dispatch:  # Allow manual triggers from GitHub UI
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Date to check (YYYY-MM-DD format, leave empty for today)'
+        required: false
+        type: string
+      venues:
+        description: 'Venue IDs to check (comma-separated, leave empty for all enabled venues)'
+        required: false
+        type: string
+      notify_always:
+        description: 'Always notify (not just on new availability)'
+        required: false
+        type: boolean
+        default: false
+      disable_notifications:
+        description: 'Disable Pushover notifications (just print results)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   check-availability:
@@ -20,6 +39,14 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
+      - name: Cache availability state
+        uses: actions/cache@v4
+        with:
+          path: config/availability_state.json
+          key: availability-state-${{ github.run_number }}
+          restore-keys: |
+            availability-state-
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -30,8 +57,28 @@ jobs:
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
         run: |
-          python check_availability.py \
-            --pushover-user "$PUSHOVER_USER" \
-            --pushover-token "$PUSHOVER_TOKEN" \
-            --date 2025-10-25
-            --notify-alway
+          ARGS="--pushover-user \"$PUSHOVER_USER\" --pushover-token \"$PUSHOVER_TOKEN\""
+
+          # Add date if provided
+          if [ -n "${{ inputs.date }}" ]; then
+            ARGS="$ARGS --date ${{ inputs.date }}"
+          fi
+
+          # Add venues if provided
+          if [ -n "${{ inputs.venues }}" ]; then
+            VENUES=$(echo "${{ inputs.venues }}" | tr ',' ' ')
+            ARGS="$ARGS --venues $VENUES"
+          fi
+
+          # Add notify-always flag if enabled
+          if [ "${{ inputs.notify_always }}" == "true" ]; then
+            ARGS="$ARGS --notify-always"
+          fi
+
+          # Add no-notify flag if enabled
+          if [ "${{ inputs.disable_notifications }}" == "true" ]; then
+            ARGS="$ARGS --no-notify"
+          fi
+
+          # Run the checker
+          eval "python check_availability.py $ARGS"
