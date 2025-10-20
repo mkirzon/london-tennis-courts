@@ -32,4 +32,6 @@ jobs:
         run: |
           python check_availability.py \
             --pushover-user "$PUSHOVER_USER" \
-            --pushover-token "$PUSHOVER_TOKEN"
+            --pushover-token "$PUSHOVER_TOKEN" \
+            -- date 2025-10-25
+            -- notify-always
