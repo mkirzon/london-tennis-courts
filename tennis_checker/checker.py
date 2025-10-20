@@ -7,7 +7,7 @@ import requests
 
 from .config import Config
 from .notifier import PushoverNotifier
-from .utils import get_new_slots, minutes_to_time, parse_availability
+from .utils import expand_time_slots, format_date, get_new_slots, parse_availability
 
 
 class AvailabilityChecker:
@@ -77,11 +77,9 @@ class AvailabilityChecker:
             if not slots:
                 print(f"{court_name}: No availability")
             else:
-                human_slots = [
-                    f"{minutes_to_time(start)}–{minutes_to_time(end)}"
-                    for start, end in slots
-                ]
-                result = f"{court_name}: {', '.join(human_slots)}"
+                # Expand time slots to show individual hour start times
+                hour_starts = expand_time_slots(slots)
+                result = f"{court_name}: {', '.join(hour_starts)}"
                 print(result)
                 venue_availability.append(result)
 
@@ -205,7 +203,9 @@ class AvailabilityChecker:
         return {
             "venues": all_results,
             "notified": notified,
-            "new_slots": new_availability_by_venue if self.notify_only_on_changes else None,
+            "new_slots": (
+                new_availability_by_venue if self.notify_only_on_changes else None
+            ),
         }
 
     def _send_notification(
@@ -215,7 +215,7 @@ class AvailabilityChecker:
         Send notification grouped by venue.
 
         Args:
-            date: Date being checked
+            date: Date being checked (YYYY-MM-DD format)
             availability_by_venue: Dictionary of venue_name -> availability list
             prefix: Prefix for notification title
 
@@ -225,8 +225,11 @@ class AvailabilityChecker:
         if not self.notifier:
             return False
 
+        # Format date for notification
+        formatted_date = format_date(date)
+
         # Build notification message grouped by venue
-        message_parts = [f"{prefix} on {date}:\n"]
+        message_parts = [f"{prefix} on {formatted_date}:\n"]
         for venue_name, slots in availability_by_venue.items():
             message_parts.append(f"\n📍 {venue_name}:")
             message_parts.extend([f"  • {slot}" for slot in slots])

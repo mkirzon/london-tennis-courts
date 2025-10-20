@@ -1,6 +1,28 @@
 """Utility functions for tennis checker."""
 
+from datetime import datetime
 from typing import List, Tuple
+
+
+def format_date(date_str: str) -> str:
+    """
+    Format date string to human-readable format.
+
+    Args:
+        date_str: Date in YYYY-MM-DD format
+
+    Returns:
+        Date in "Monday Oct. 20" format
+    """
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        # Format as "Monday Oct. 20"
+        # Use .lstrip('0') to remove leading zeros for cross-platform compatibility
+        day = date_obj.strftime("%d").lstrip("0")
+        return f"{date_obj.strftime('%A')} {date_obj.strftime('%b')}. {day}"
+    except Exception:
+        # Fallback to original if parsing fails
+        return date_str
 
 
 def minutes_to_time(minutes: int) -> str:
@@ -24,6 +46,28 @@ def minutes_to_time(minutes: int) -> str:
         return "12pm"
     else:
         return f"{hours - 12}pm"
+
+
+def expand_time_slots(slots: List[Tuple[int, int]]) -> List[str]:
+    """
+    Expand time slot ranges into individual hour start times.
+
+    Args:
+        slots: List of (start_time, end_time) tuples in minutes since midnight
+
+    Returns:
+        List of individual hour start times (e.g., ["2pm", "3pm", "5pm"])
+    """
+    hour_starts = []
+
+    for start, end in slots:
+        # Generate all hour starts within this slot range
+        current = start
+        while current < end:
+            hour_starts.append(minutes_to_time(current))
+            current += 60  # Move to next hour
+
+    return hour_starts
 
 
 def parse_availability(

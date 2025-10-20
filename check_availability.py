@@ -12,6 +12,7 @@ from datetime import datetime
 from tennis_checker.checker import AvailabilityChecker
 from tennis_checker.config import Config
 from tennis_checker.notifier import PushoverNotifier
+from tennis_checker.utils import format_date
 
 
 def main():
@@ -73,7 +74,8 @@ def main():
     )
 
     # Check availability
-    print(f"Checking availability for {args.date}...")
+    formatted_date = format_date(args.date)
+    print(f"Checking availability for {formatted_date}...")
     result = checker.check_all_venues(date=args.date, enabled_venue_ids=args.venues)
 
     # Exit with appropriate code

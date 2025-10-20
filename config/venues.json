@@ -9,7 +9,7 @@
     {
       "id": "clissold_park",
       "name": "Clissold Park",
-      "url_template": "https://clubspark.lta.org.uk/v0/VenueBooking/ClissoldPark/GetVenueSessions?resourceID=&startDate={date}&endDate={date}&roleId=",
+      "url_template": "https://clubspark.lta.org.uk/v0/VenueBooking/ClissoldParkHackney/GetVenueSessions?resourceID=&startDate={date}&endDate={date}&roleId=",
       "enabled": true
     }
   ]

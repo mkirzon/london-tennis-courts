@@ -10,8 +10,6 @@ A Python package that checks tennis court availability at multiple venues (via C
 - **Per-venue state tracking**: Accurate change detection for each venue
 - **Command-line interface**: Easy to use with flexible options
 - **Configurable**: Manage venues via JSON configuration
-- **Human-readable dates**: Shows "Monday Oct. 20" format
-- **Individual time slots**: Lists each available hour separately (e.g., "2pm, 3pm, 5pm")
 
 ## Project Structure
 
@@ -156,39 +154,18 @@ options:
                         Pushover user key
   --pushover-token PUSHOVER_TOKEN
                         Pushover API token
-  --no-notify           Disable notifications (just print results)
-```
-
-## Example Output
-
-### Multi-Venue Output
-
-Times are shown as individual hour start times, making it easy to see each available booking slot:
-
-```
-Checking availability for Friday Sep. 13...
-
-============================================================
+Checking Finsbury Park...
+=====================================================
 Checking Finsbury Park...
 ============================================================
-Court 1: 7am, 9pm
-Court 2: 7am, 9pm
-Court 3: No availability
-Court 4 (no floodlights): 7am
-Court 5 (no floodlights): 7am, 8am
-Court 6: 7am, 8am, 8pm, 9pm
-Court 7: 8pm, 9pm
-Court 8: 9pm
-
-🎾 2 new slot(s) detected at Finsbury Park
-
-============================================================
+Checking Clissold Park...
+=====================================================
 Checking Clissold Park...
 ============================================================
-Court 1: 2pm
-Court 2: 2pm, 5pm
+Court 1: 2pm–3pm
+Court 2: 2pm–3pm, 5pm–6pm
 Court 3: No availability
-Court 4: 8pm
+Court 4: 8pm–9pm
 Court 5: No availability
 
 🎾 3 new slot(s) detected at Clissold Park
@@ -203,19 +180,19 @@ SUMMARY
 
 ### Notification Format
 
-Notifications show individual start times grouped by venue with human-readable dates:
+Notifications are grouped by venue with human-readable dates:
 
 ```
 New courts available on Friday Sep. 13:
 
 📍 Finsbury Park:
-  • Court 1: 7am, 9pm
-  • Court 2: 7am, 9pm
+  • Court 1: 7am–8am, 9pm–10pm
+  • Court 2: 7am–8am, 9pm–10pm
 
 📍 Clissold Park:
-  • Court 1: 2pm
-  • Court 2: 2pm, 5pm
-  • Court 4: 8pm
+  • Court 1: 2pm–3pm
+  • Court 2: 2pm–3pm, 5pm–6pm
+  • Court 4: 8pm–9pm
 ```
 
 ## State Tracking
@@ -227,15 +204,15 @@ When `--notify-always` is NOT used (default behavior), the script tracks availab
   "finsbury_park": {
     "name": "Finsbury Park",
     "availability": [
-      "Court 1: 7am, 9pm",
-      "Court 2: 7am, 9pm"
+      "Court 1: 7am–8am, 9pm–10pm",
+      "Court 2: 7am–8am, 9pm–10pm"
     ]
   },
   "clissold_park": {
     "name": "Clissold Park",
     "availability": [
-      "Court 1: 2pm",
-      "Court 2: 2pm, 5pm"
+      "Court 1: 2pm–3pm",
+      "Court 2: 2pm–3pm, 5pm–6pm"
     ]
   },
   "last_checked": "2025-01-15T10:30:45.123456"
@@ -302,11 +279,7 @@ The script fetches data from the ClubSpark LTA booking API. Key fields:
 - **`Sessions`**: Array of time slots
   - `Category`: 0 = Available, 1000 = Booked, 2000 = Class, 8000 = Closed
   - `Capacity`: Number of available slots (≥1 = bookable)
-  - `StartTime`/`EndTime`: Minutes since midnight (e.g., 840 = 2pm)
-
-The script expands time ranges into individual hour start times. For example:
-- A slot from 2pm-4pm becomes: "2pm, 3pm"
-- A slot from 5pm-6pm becomes: "5pm"
+  - `StartTime`/`EndTime`: Minutes since midnight
 
 See `examples/` directory for sample API responses.
 
