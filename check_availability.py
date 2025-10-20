@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import os
 from datetime import datetime
 
 from tennis_checker.checker import AvailabilityChecker
@@ -41,14 +42,14 @@ def main():
     parser.add_argument(
         "--pushover-user",
         type=str,
-        default="***REMOVED***",
-        help="Pushover user key",
+        default=os.environ.get("PUSHOVER_USER"),
+        help="Pushover user key (can also be set via PUSHOVER_USER environment variable)",
     )
     parser.add_argument(
         "--pushover-token",
         type=str,
-        default="***REMOVED***",
-        help="Pushover API token",
+        default=os.environ.get("PUSHOVER_TOKEN"),
+        help="Pushover API token (can also be set via PUSHOVER_TOKEN environment variable)",
     )
     parser.add_argument(
         "--no-notify",
