@@ -1,15 +1,19 @@
 # Tennis Court Availability Checker
 
-A Python script that checks tennis court availability at Finsbury Park (via ClubSpark LTA API) and sends push notifications via Pushover when courts are available.
+A Python script that checks tennis court availability at multiple venues (via ClubSpark LTA API) and sends push notifications via Pushover when courts are available.
 
 ## Features
 
+- **Multi-venue support**: Check availability across multiple tennis parks
 - Checks court availability for a specific date
 - Converts time slots from minutes-since-midnight to human-readable format (e.g., "7am", "2pm")
-- Sends push notifications via Pushover
+- Sends push notifications via Pushover grouped by venue
 - Optional state tracking to only notify on NEW availability (not on every run)
+- Per-venue state tracking for accurate change detection
 
 ## Configuration
+
+### Main Script Configuration
 
 Edit the following variables in `check_availability.py`:
 
@@ -17,6 +21,61 @@ Edit the following variables in `check_availability.py`:
 - `PUSHOVER_USER_KEY`: Your Pushover user key
 - `PUSHOVER_API_TOKEN`: Your Pushover API token
 - `NOTIFY_ONLY_ON_CHANGES`: Toggle notification behavior (see below)
+- `ENABLED_VENUES`: List of venue IDs to check (see Venue Configuration below)
+
+### Venue Configuration
+
+Venues are configured in `venues.json`. Each venue has:
+
+```json
+{
+  "id": "unique_venue_id",
+  "name": "Display Name",
+  "url_template": "https://clubspark.lta.org.uk/v0/VenueBooking/{VenueName}/GetVenueSessions?resourceID=&startDate={date}&endDate={date}&roleId=",
+  "enabled": true
+}
+```
+
+**Adding a New Venue:**
+
+1. Add a new entry to the `venues` array in `venues.json`
+2. Set a unique `id` (e.g., `"hampstead_heath"`)
+3. Set the `name` (e.g., `"Hampstead Heath"`)
+4. Set the `url_template` with the correct venue path (replace `{VenueName}` with the actual venue name from the ClubSpark URL)
+5. Set `enabled: true` to enable the venue
+
+**Example venues.json:**
+
+```json
+{
+  "venues": [
+    {
+      "id": "finsbury_park",
+      "name": "Finsbury Park",
+      "url_template": "https://clubspark.lta.org.uk/v0/VenueBooking/FinsburyPark/GetVenueSessions?resourceID=&startDate={date}&endDate={date}&roleId=",
+      "enabled": true
+    },
+    {
+      "id": "clissold_park",
+      "name": "Clissold Park",
+      "url_template": "https://clubspark.lta.org.uk/v0/VenueBooking/ClissoldPark/GetVenueSessions?resourceID=&startDate={date}&endDate={date}&roleId=",
+      "enabled": true
+    }
+  ]
+}
+```
+
+**Controlling Which Venues to Check:**
+
+In `check_availability.py`, modify the `ENABLED_VENUES` list:
+
+```python
+# Check specific venues only
+ENABLED_VENUES = ["finsbury_park", "clissold_park"]
+
+# Check all venues marked as enabled in venues.json
+ENABLED_VENUES = []  # or None
+```
 
 ### Notification Modes
 
@@ -25,7 +84,8 @@ The `NOTIFY_ONLY_ON_CHANGES` toggle controls notification behavior:
 - **`True` (default)**: Only sends notifications when NEW slots become available
   - Tracks availability between runs using `availability_state.json`
   - Prevents repeated notifications for the same available slots
-  - Shows status: "All slots were already known (no notification sent)"
+  - Shows status per venue: "All slots were already known (no notification sent)"
+  - State is tracked separately for each venue
 
 - **`False`**: Original behavior - always notifies when ANY slots are available
   - Sends notification on every run if availability exists
@@ -42,6 +102,89 @@ python check_availability.py
 ```bash
 pip install requests
 ```
+
+## Example Output
+
+### Multi-Venue Output
+
+When checking multiple venues, the output is organized by venue:
+
+```
+============================================================
+Checking Finsbury Park...
+============================================================
+Court 1: 7am–8am, 9pm–10pm
+Court 2: 7am–8am, 9pm–10pm
+Court 3: No availability
+Court 4 (no floodlights): 7am–8am
+Court 5 (no floodlights): 7am–9am
+Court 6: 7am–9am, 8pm–10pm
+Court 7: 8pm–10pm
+Court 8: 9pm–10pm
+
+🎾 2 new slot(s) detected at Finsbury Park
+
+============================================================
+Checking Clissold Park...
+============================================================
+Court 1: 2pm–3pm
+Court 2: 2pm–3pm, 5pm–6pm
+Court 3: No availability
+Court 4: 8pm–9pm
+Court 5: No availability
+
+🎾 3 new slot(s) detected at Clissold Park
+
+============================================================
+SUMMARY
+============================================================
+
+🎾 5 total new slot(s) across all venues!
+✓ Pushover notification sent
+```
+
+### Notification Format
+
+Notifications group availability by venue:
+
+```
+New courts available on 2025-09-13:
+
+📍 Finsbury Park:
+  • Court 1: 7am–8am, 9pm–10pm
+  • Court 2: 7am–8am, 9pm–10pm
+
+📍 Clissold Park:
+  • Court 1: 2pm–3pm
+  • Court 2: 2pm–3pm, 5pm–6pm
+  • Court 4: 8pm–9pm
+```
+
+## State Tracking
+
+When `NOTIFY_ONLY_ON_CHANGES = True`, the script creates an `availability_state.json` file organized by venue:
+
+```json
+{
+  "finsbury_park": {
+    "name": "Finsbury Park",
+    "availability": [
+      "Court 1: 7am–8am, 9pm–10pm",
+      "Court 2: 7am–8am, 9pm–10pm"
+    ]
+  },
+  "clissold_park": {
+    "name": "Clissold Park",
+    "availability": [
+      "Court 1: 2pm–3pm",
+      "Court 2: 2pm–3pm, 5pm–6pm"
+    ]
+  },
+  "last_checked": "2025-01-15T10:30:45.123456"
+}
+```
+
+This file tracks availability per venue and is used to compare between runs to determine which slots are newly available.
 
 ## API Response Format
 
@@ -149,13 +292,16 @@ The `Category` field indicates the session type:
 
 ### Example Flow
 
-1. Script fetches JSON from API
-2. Iterates through each `Resource` (court)
-3. For each court, finds the target date in `Days`
-4. Scans all `Sessions` for that date
-5. Identifies available slots where `Category == 0` and `Capacity >= 1`
-6. Converts `StartTime`/`EndTime` from minutes to human-readable format
-7. Sends notification if new availability detected (depending on `NOTIFY_ONLY_ON_CHANGES` setting)
+1. Script loads venue configurations from `venues.json`
+2. For each enabled venue:
+   - Fetches JSON from API using the venue's URL template
+   - Iterates through each `Resource` (court)
+   - For each court, finds the target date in `Days`
+   - Scans all `Sessions` for that date
+   - Identifies available slots where `Category == 0` and `Capacity >= 1`
+   - Converts `StartTime`/`EndTime` from minutes to human-readable format
+3. Compares with previous state (if `NOTIFY_ONLY_ON_CHANGES = True`)
+4. Groups new availability by venue and sends notification
 
 ### Time Conversion
 
@@ -165,35 +311,3 @@ Times are stored as minutes since midnight:
 - `1260` minutes = 9:00 PM
 
 The script's `minutes_to_time()` function converts these to 12-hour format (e.g., "7am", "9pm").
-
-## Example Output
-
-```
-Court 1: 7am–8am, 9pm–10pm
-Court 2: 7am–8am, 9pm–10pm
-Court 3: 7am–8am, 4pm–5pm, 8pm–10pm
-Court 4 (no floodlights): 7am–8am
-Court 5 (no floodlights): 7am–9am
-Court 6: 7am–9am, 8pm–10pm
-Court 7: 8pm–10pm
-Court 8: 9pm–10pm
-
-🎾 3 new slot(s) detected!
-✓ Pushover notification sent
-```
-
-## State Tracking
-
-When `NOTIFY_ONLY_ON_CHANGES = True`, the script creates an `availability_state.json` file:
-
-```json
-{
-  "availability": [
-    "Court 1: 7am–8am, 9pm–10pm",
-    "Court 2: 7am–8am, 9pm–10pm"
-  ],
-  "last_checked": "2025-01-15T10:30:45.123456"
-}
-```
-
-This file is used to compare availability between runs and determine which slots are newly available.

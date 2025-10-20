@@ -1,13 +1,11 @@
 import json
-import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import requests
 
 # --- Config ---
 DATE = "2025-09-13"
-URL = f"https://clubspark.lta.org.uk/v0/VenueBooking/FinsburyPark/GetVenueSessions?resourceID=&startDate={DATE}&endDate={DATE}&roleId="
 
 # Pushover credentials (set these as environment variables)
 PUSHOVER_USER_KEY = "***REMOVED***"
@@ -17,6 +15,40 @@ PUSHOVER_API_TOKEN = "***REMOVED***"
 # True: Only notify when there are NEW slots (compared to previous run)
 # False: Always notify when ANY slots are available (original behavior)
 NOTIFY_ONLY_ON_CHANGES = True
+
+# Venue selection
+# List of venue IDs to check (from venues.json)
+# Set to None or empty list to check all enabled venues
+ENABLED_VENUES = ["finsbury_park", "clissold_park"]
+
+
+# --- Venue Management ---
+VENUES_FILE = Path(__file__).parent / "venues.json"
+
+
+def load_venues():
+    """Load venue configurations from venues.json."""
+    if not VENUES_FILE.exists():
+        print(f"Error: {VENUES_FILE} not found")
+        return []
+
+    try:
+        with open(VENUES_FILE, "r") as f:
+            data = json.load(f)
+            return data.get("venues", [])
+    except Exception as e:
+        print(f"Error loading venues: {e}")
+        return []
+
+
+def get_enabled_venues():
+    """Get list of venues to check based on ENABLED_VENUES setting."""
+    all_venues = load_venues()
+
+    if ENABLED_VENUES is None or len(ENABLED_VENUES) == 0:
+        return [v for v in all_venues if v.get("enabled", True)]
+
+    return [v for v in all_venues if v["id"] in ENABLED_VENUES]
 
 
 # --- State Management ---
@@ -118,20 +150,31 @@ def send_pushover_notification(message, title="Tennis Court Availability"):
 
 
 # --- Main ---
-def check_availability():
-    # Load previous state
-    previous_availability = load_previous_state().get("availability", [])
+def check_venue_availability(venue):
+    """Check availability for a single venue."""
+    venue_id = venue["id"]
+    venue_name = venue["name"]
+    url = venue["url_template"].format(date=DATE)
 
-    r = requests.get(URL)
-    data = r.json()
+    print(f"\n{'=' * 60}")
+    print(f"Checking {venue_name}...")
+    print(f"{'=' * 60}")
 
-    earliest = data["EarliestStartTime"]
-    latest = data["LatestEndTime"]
-    min_interval = data["MinimumInterval"]
+    try:
+        r = requests.get(url)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        print(f"Error fetching data for {venue_name}: {e}")
+        return []
 
-    current_availability = []
+    earliest = data.get("EarliestStartTime", 420)
+    latest = data.get("LatestEndTime", 1320)
+    min_interval = data.get("MinimumInterval", 60)
 
-    for resource in data["Resources"]:
+    venue_availability = []
+
+    for resource in data.get("Resources", []):
         court_name = resource["Name"]
         day = next((d for d in resource["Days"] if d["Date"].startswith(DATE)), None)
         if not day:
@@ -149,37 +192,120 @@ def check_availability():
             ]
             result = f"{court_name}: {', '.join(human_slots)}"
             print(result)
-            current_availability.append(result)
+            venue_availability.append(result)
 
-    # Determine what to notify about based on the toggle
+    return venue_availability
+
+
+def check_availability():
+    """Check availability for all enabled venues."""
+    venues = get_enabled_venues()
+
+    if not venues:
+        print("No venues enabled. Please check venues.json")
+        return
+
+    # Load previous state (organized by venue)
+    previous_state = load_previous_state()
+
+    # Track results across all venues
+    all_results = {}
+    new_availability_by_venue = {}
+    total_new_slots = 0
+
+    # Check each venue
+    for venue in venues:
+        venue_id = venue["id"]
+        venue_name = venue["name"]
+
+        current_availability = check_venue_availability(venue)
+
+        # Store current results
+        all_results[venue_id] = {
+            "name": venue_name,
+            "availability": current_availability,
+        }
+
+        # Compare with previous state if tracking changes
+        if NOTIFY_ONLY_ON_CHANGES:
+            previous_availability = previous_state.get(venue_id, {}).get(
+                "availability", []
+            )
+            new_slots = get_new_slots(current_availability, previous_availability)
+
+            if new_slots:
+                new_availability_by_venue[venue_name] = new_slots
+                total_new_slots += len(new_slots)
+
+            if current_availability:
+                if new_slots:
+                    print(
+                        f"\n🎾 {len(new_slots)} new slot(s) detected at {venue_name}"
+                    )
+                else:
+                    print(f"\n✓ All slots at {venue_name} were already known")
+            else:
+                print(f"\n✗ No availability at {venue_name}")
+
+    # Send notification based on mode
+    print(f"\n{'=' * 60}")
+    print("SUMMARY")
+    print(f"{'=' * 60}")
+
     if NOTIFY_ONLY_ON_CHANGES:
-        # Only notify on new slots
-        new_slots = get_new_slots(current_availability, previous_availability)
+        if new_availability_by_venue:
+            print(f"\n🎾 {total_new_slots} total new slot(s) across all venues!")
 
-        if new_slots:
-            print(f"\n🎾 {len(new_slots)} new slot(s) detected!")
-            message = f"New courts available on {DATE}:\n\n" + "\n".join(new_slots)
-            send_pushover_notification(message)
-        elif current_availability:
-            print("\n✓ All slots were already known (no notification sent)")
+            # Build notification message grouped by venue
+            message_parts = [f"New courts available on {DATE}:\n"]
+            for venue_name, slots in new_availability_by_venue.items():
+                message_parts.append(f"\n📍 {venue_name}:")
+                message_parts.extend([f"  • {slot}" for slot in slots])
+
+            message = "\n".join(message_parts)
+            send_pushover_notification(message, "Tennis Courts Available")
         else:
-            print("\n✗ No availability found")
+            total_slots = sum(
+                len(v["availability"]) for v in all_results.values()
+            )
+            if total_slots > 0:
+                print(
+                    f"✓ {total_slots} slot(s) found, but all were already known (no notification sent)"
+                )
+            else:
+                print("✗ No availability found at any venue")
     else:
         # Original behavior: notify whenever there's ANY availability
-        if current_availability:
-            print(f"\n🎾 {len(current_availability)} slot(s) available")
-            message = f"Courts available on {DATE}:\n\n" + "\n".join(
-                current_availability
-            )
-            send_pushover_notification(message)
+        total_slots = sum(len(v["availability"]) for v in all_results.values())
+
+        if total_slots > 0:
+            print(f"🎾 {total_slots} slot(s) available across all venues")
+
+            # Build notification message grouped by venue
+            message_parts = [f"Courts available on {DATE}:\n"]
+            for venue_id, venue_data in all_results.items():
+                if venue_data["availability"]:
+                    message_parts.append(f"\n📍 {venue_data['name']}:")
+                    message_parts.extend(
+                        [f"  • {slot}" for slot in venue_data["availability"]]
+                    )
+
+            message = "\n".join(message_parts)
+            send_pushover_notification(message, "Tennis Courts Available")
         else:
-            print("\n✗ No availability found")
+            print("✗ No availability found at any venue")
 
     # Save current state for next run (only if tracking changes)
     if NOTIFY_ONLY_ON_CHANGES:
         save_current_state(
             {
-                "availability": current_availability,
+                **{
+                    venue_id: {
+                        "name": data["name"],
+                        "availability": data["availability"],
+                    }
+                    for venue_id, data in all_results.items()
+                },
                 "last_checked": datetime.now().isoformat(),
             }
         )

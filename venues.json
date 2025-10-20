@@ -1,0 +1,16 @@
+{
+  "venues": [
+    {
+      "id": "finsbury_park",
+      "name": "Finsbury Park",
+      "url_template": "https://clubspark.lta.org.uk/v0/VenueBooking/FinsburyPark/GetVenueSessions?resourceID=&startDate={date}&endDate={date}&roleId=",
+      "enabled": true
+    },
+    {
+      "id": "clissold_park",
+      "name": "Clissold Park",
+      "url_template": "https://clubspark.lta.org.uk/v0/VenueBooking/ClissoldPark/GetVenueSessions?resourceID=&startDate={date}&endDate={date}&roleId=",
+      "enabled": true
+    }
+  ]
+}
