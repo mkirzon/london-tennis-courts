@@ -13,6 +13,11 @@ URL = f"https://clubspark.lta.org.uk/v0/VenueBooking/FinsburyPark/GetVenueSessio
 PUSHOVER_USER_KEY = "***REMOVED***"
 PUSHOVER_API_TOKEN = "***REMOVED***"
 
+# Notification mode toggle
+# True: Only notify when there are NEW slots (compared to previous run)
+# False: Always notify when ANY slots are available (original behavior)
+NOTIFY_ONLY_ON_CHANGES = True
+
 
 # --- State Management ---
 STATE_FILE = Path(__file__).parent / "availability_state.json"
@@ -146,25 +151,38 @@ def check_availability():
             print(result)
             current_availability.append(result)
 
-    # Check for new availability
-    new_slots = get_new_slots(current_availability, previous_availability)
+    # Determine what to notify about based on the toggle
+    if NOTIFY_ONLY_ON_CHANGES:
+        # Only notify on new slots
+        new_slots = get_new_slots(current_availability, previous_availability)
 
-    if new_slots:
-        print(f"\n🎾 {len(new_slots)} new slot(s) detected!")
-        message = f"New courts available on {DATE}:\n\n" + "\n".join(new_slots)
-        send_pushover_notification(message)
-    elif current_availability:
-        print("\n✓ All slots were already known (no notification sent)")
+        if new_slots:
+            print(f"\n🎾 {len(new_slots)} new slot(s) detected!")
+            message = f"New courts available on {DATE}:\n\n" + "\n".join(new_slots)
+            send_pushover_notification(message)
+        elif current_availability:
+            print("\n✓ All slots were already known (no notification sent)")
+        else:
+            print("\n✗ No availability found")
     else:
-        print("\n✗ No availability found")
+        # Original behavior: notify whenever there's ANY availability
+        if current_availability:
+            print(f"\n🎾 {len(current_availability)} slot(s) available")
+            message = f"Courts available on {DATE}:\n\n" + "\n".join(
+                current_availability
+            )
+            send_pushover_notification(message)
+        else:
+            print("\n✗ No availability found")
 
-    # Save current state for next run
-    save_current_state(
-        {
-            "availability": current_availability,
-            "last_checked": datetime.now().isoformat(),
-        }
-    )
+    # Save current state for next run (only if tracking changes)
+    if NOTIFY_ONLY_ON_CHANGES:
+        save_current_state(
+            {
+                "availability": current_availability,
+                "last_checked": datetime.now().isoformat(),
+            }
+        )
 
 
 if __name__ == "__main__":
