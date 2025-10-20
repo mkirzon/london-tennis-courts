@@ -14,9 +14,18 @@ PUSHOVER_API_TOKEN = "***REMOVED***"
 
 # --- Helpers ---
 def minutes_to_time(m):
-    """Convert minutes from midnight (e.g., 420) to HH:MM string."""
+    """Convert minutes from midnight (e.g., 420) to 12-hour format (e.g., 7am)."""
     h, mins = divmod(m, 60)
-    return f"{h:02d}:{mins:02d}"
+
+    # Convert to 12-hour format
+    if h == 0:
+        return "12am"
+    elif h < 12:
+        return f"{h}am"
+    elif h == 12:
+        return "12pm"
+    else:
+        return f"{h - 12}pm"
 
 
 def parse_availability(resource, day, earliest, latest, min_interval):
