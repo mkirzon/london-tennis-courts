@@ -1,17 +1,8 @@
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv/
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -29,16 +20,25 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# State files
+config/availability_state.json
+
+# OS
 .DS_Store
+Thumbs.db
 
-# Environment variables (if you create a .env file)
-.env
-
-# Test files
-pushertest.py
+# Project specific
+*.log

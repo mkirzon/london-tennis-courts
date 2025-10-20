@@ -1,50 +1,67 @@
 # Tennis Court Availability Checker
 
-A Python script that checks tennis court availability at multiple venues (via ClubSpark LTA API) and sends push notifications via Pushover when courts are available.
+A Python package that checks tennis court availability at multiple venues (via ClubSpark LTA API) and sends push notifications via Pushover when courts are available.
 
 ## Features
 
 - **Multi-venue support**: Check availability across multiple tennis parks
-- Checks court availability for a specific date
-- Converts time slots from minutes-since-midnight to human-readable format (e.g., "7am", "2pm")
-- Sends push notifications via Pushover grouped by venue
-- Optional state tracking to only notify on NEW availability (not on every run)
-- Per-venue state tracking for accurate change detection
+- **Modular architecture**: Clean, maintainable code structure
+- **Smart notifications**: Only notify on NEW availability (configurable)
+- **Per-venue state tracking**: Accurate change detection for each venue
+- **Command-line interface**: Easy to use with flexible options
+- **Configurable**: Manage venues via JSON configuration
+
+## Project Structure
+
+```
+tennis-availability-checker/
+├── tennis_checker/          # Main package
+│   ├── __init__.py         # Package initialization
+│   ├── checker.py          # Core availability checking logic
+│   ├── config.py           # Configuration management
+│   ├── notifier.py         # Pushover notification handling
+│   └── utils.py            # Utility functions
+├── config/                  # Configuration files
+│   ├── venues.json         # Venue definitions
+│   └── availability_state.json  # State tracking (auto-generated)
+├── examples/                # Sample API responses
+│   ├── sample-finpark.json
+│   └── sample-clissold.json
+├── check_availability.py    # CLI entry point
+├── setup.py                # Package setup
+├── requirements.txt        # Dependencies
+├── .gitignore              # Git ignore rules
+└── README.md              # This file
+```
+
+## Installation
+
+### Option 1: Local Development
+
+1. Clone or download the repository
+2. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Option 2: Install as Package
+
+```bash
+pip install -e .
+```
+
+This installs the package in editable mode and creates a `tennis-checker` command.
 
 ## Configuration
 
-### Main Script Configuration
-
-Edit the following variables in `check_availability.py`:
-
-- `DATE`: Target date to check (format: "YYYY-MM-DD")
-- `PUSHOVER_USER_KEY`: Your Pushover user key
-- `PUSHOVER_API_TOKEN`: Your Pushover API token
-- `NOTIFY_ONLY_ON_CHANGES`: Toggle notification behavior (see below)
-- `ENABLED_VENUES`: List of venue IDs to check (see Venue Configuration below)
-
 ### Venue Configuration
 
-Venues are configured in `venues.json`. Each venue has:
-
-```json
-{
-  "id": "unique_venue_id",
-  "name": "Display Name",
-  "url_template": "https://clubspark.lta.org.uk/v0/VenueBooking/{VenueName}/GetVenueSessions?resourceID=&startDate={date}&endDate={date}&roleId=",
-  "enabled": true
-}
-```
-
-**Adding a New Venue:**
-
-1. Add a new entry to the `venues` array in `venues.json`
-2. Set a unique `id` (e.g., `"hampstead_heath"`)
-3. Set the `name` (e.g., `"Hampstead Heath"`)
-4. Set the `url_template` with the correct venue path (replace `{VenueName}` with the actual venue name from the ClubSpark URL)
-5. Set `enabled: true` to enable the venue
-
-**Example venues.json:**
+Venues are configured in `config/venues.json`:
 
 ```json
 {
@@ -65,51 +82,88 @@ Venues are configured in `venues.json`. Each venue has:
 }
 ```
 
-**Controlling Which Venues to Check:**
+**Adding a New Venue:**
 
-In `check_availability.py`, modify the `ENABLED_VENUES` list:
+1. Add a new entry to the `venues` array
+2. Set a unique `id` (e.g., `"hampstead_heath"`)
+3. Set the `name` (e.g., `"Hampstead Heath"`)
+4. Set the `url_template` with the correct ClubSpark venue path
+5. Set `enabled: true`
 
-```python
-# Check specific venues only
-ENABLED_VENUES = ["finsbury_park", "clissold_park"]
+### Pushover Credentials
 
-# Check all venues marked as enabled in venues.json
-ENABLED_VENUES = []  # or None
+Set your Pushover credentials in the CLI arguments:
+
+```bash
+python check_availability.py \
+  --pushover-user YOUR_USER_KEY \
+  --pushover-token YOUR_API_TOKEN
 ```
 
-### Notification Modes
-
-The `NOTIFY_ONLY_ON_CHANGES` toggle controls notification behavior:
-
-- **`True` (default)**: Only sends notifications when NEW slots become available
-  - Tracks availability between runs using `availability_state.json`
-  - Prevents repeated notifications for the same available slots
-  - Shows status per venue: "All slots were already known (no notification sent)"
-  - State is tracked separately for each venue
-
-- **`False`**: Original behavior - always notifies when ANY slots are available
-  - Sends notification on every run if availability exists
-  - Does not track state between runs
+Or modify the defaults in `check_availability.py`.
 
 ## Usage
 
+### Basic Usage
+
+Check all enabled venues for today:
 ```bash
 python check_availability.py
 ```
 
-## Dependencies
+### Check Specific Date
 
 ```bash
-pip install requests
+python check_availability.py --date 2025-09-13
+```
+
+### Check Specific Venues Only
+
+```bash
+python check_availability.py --venues finsbury_park clissold_park
+```
+
+### Disable Notifications (Test Mode)
+
+```bash
+python check_availability.py --no-notify
+```
+
+### Always Notify (Don't Track Changes)
+
+By default, the checker only notifies on NEW availability. To get notifications every time there's ANY availability:
+
+```bash
+python check_availability.py --notify-always
+```
+
+### Full Command Options
+
+```bash
+python check_availability.py --help
+```
+
+```
+options:
+  -h, --help            show this help message and exit
+  --date DATE           Date to check (YYYY-MM-DD format). Defaults to today.
+  --venues VENUES [VENUES ...]
+                        Venue IDs to check. If not specified, checks all enabled venues.
+  --notify-always       Always send notifications when courts are available (not just for new slots)
+  --pushover-user PUSHOVER_USER
+                        Pushover user key
+  --pushover-token PUSHOVER_TOKEN
+                        Pushover API token
+  --no-notify           Disable notifications (just print results)
 ```
 
 ## Example Output
 
 ### Multi-Venue Output
 
-When checking multiple venues, the output is organized by venue:
-
 ```
+Checking availability for 2025-09-13...
+
 ============================================================
 Checking Finsbury Park...
 ============================================================
@@ -145,7 +199,7 @@ SUMMARY
 
 ### Notification Format
 
-Notifications group availability by venue:
+Notifications are grouped by venue:
 
 ```
 New courts available on 2025-09-13:
@@ -162,7 +216,7 @@ New courts available on 2025-09-13:
 
 ## State Tracking
 
-When `NOTIFY_ONLY_ON_CHANGES = True`, the script creates an `availability_state.json` file organized by venue:
+When `--notify-always` is NOT used (default behavior), the script tracks availability in `config/availability_state.json`:
 
 ```json
 {
@@ -184,130 +238,93 @@ When `NOTIFY_ONLY_ON_CHANGES = True`, the script creates an `availability_state.
 }
 ```
 
-This file tracks availability per venue and is used to compare between runs to determine which slots are newly available.
+This file is automatically managed and should not be edited manually.
+
+## Scheduling (Cron/Task Scheduler)
+
+To run the checker automatically:
+
+### Linux/Mac (cron)
+
+```bash
+# Edit crontab
+crontab -e
+
+# Run every hour
+0 * * * * cd /path/to/tennis-availability-checker && /path/to/venv/bin/python check_availability.py
+
+# Run every 15 minutes
+*/15 * * * * cd /path/to/tennis-availability-checker && /path/to/venv/bin/python check_availability.py
+```
+
+### Windows (Task Scheduler)
+
+Create a batch file `run_checker.bat`:
+
+```batch
+@echo off
+cd /d C:\path\to\tennis-availability-checker
+venv\Scripts\python.exe check_availability.py
+```
+
+Then schedule it in Task Scheduler.
+
+## Development
+
+### Running Tests
+
+```bash
+# Install development dependencies
+pip install pytest pytest-cov
+
+# Run tests (when implemented)
+pytest tests/
+```
+
+### Code Structure
+
+- **`tennis_checker/checker.py`**: Main availability checking logic
+- **`tennis_checker/config.py`**: Configuration and state management
+- **`tennis_checker/notifier.py`**: Pushover notification handling
+- **`tennis_checker/utils.py`**: Helper functions (time conversion, parsing)
+- **`check_availability.py`**: CLI interface
 
 ## API Response Format
 
-The script fetches data from the ClubSpark LTA booking API. The response structure is documented below using `sample-finpark.json` as reference.
+The script fetches data from the ClubSpark LTA booking API. Key fields:
 
-### Top-Level Structure
+- **`Resources`**: Array of courts
+- **`Days`**: Array of dates with sessions
+- **`Sessions`**: Array of time slots
+  - `Category`: 0 = Available, 1000 = Booked, 2000 = Class, 8000 = Closed
+  - `Capacity`: Number of available slots (≥1 = bookable)
+  - `StartTime`/`EndTime`: Minutes since midnight
 
-```json
-{
-  "TimeZone": "Europe/London",
-  "EarliestStartTime": 420,
-  "LatestEndTime": 1320,
-  "MinimumInterval": 60,
-  "Resources": [ /* array of court resources */ ]
-}
-```
+See `examples/` directory for sample API responses.
 
-**Key Fields:**
-- `TimeZone`: Timezone for all times in the response
-- `EarliestStartTime`: Earliest booking time in minutes since midnight (420 = 7:00 AM)
-- `LatestEndTime`: Latest booking time in minutes since midnight (1320 = 10:00 PM)
-- `MinimumInterval`: Minimum booking interval in minutes (typically 60)
-- `Resources`: Array of court resources (see below)
+## License
 
-### Resources (Courts)
+MIT License - feel free to use and modify as needed.
 
-Each resource represents a tennis court:
+## Contributing
 
-```json
-{
-  "ID": "f51042cf-95c8-4aca-acdf-0206636b5db0",
-  "Name": "Court 1",
-  "Number": 0,
-  "Lighting": 1,
-  "Surface": 6,
-  "Days": [ /* array of day objects */ ]
-}
-```
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-**Key Fields:**
-- `ID`: Unique identifier for the court
-- `Name`: Display name (e.g., "Court 1", "Court 4 (no floodlights)")
-- `Number`: Court number index (0-based)
-- `Lighting`: Whether court has floodlights (1 = yes, 0 = no)
-- `Surface`: Court surface type (6 appears to be hard court)
-- `Days`: Array of days with session data
+## Troubleshooting
 
-### Days
+**Issue**: "No venues enabled"
+- **Solution**: Check `config/venues.json` exists and has venues with `enabled: true`
 
-Each day contains session information for a specific date:
+**Issue**: "Error fetching data for [venue]"
+- **Solution**: Check your internet connection and verify the venue URL is correct
 
-```json
-{
-  "Date": "2025-09-13T00:00:00",
-  "Sessions": [ /* array of session objects */ ]
-}
-```
+**Issue**: Not receiving notifications
+- **Solution**: Verify Pushover credentials are correct and you're not using `--no-notify`
 
-### Sessions (Time Slots)
-
-Each session represents a bookable time slot:
-
-```json
-{
-  "ID": "056427f3-f6e7-4dca-96b8-409c5925cef3",
-  "Category": 0,
-  "SubCategory": 0,
-  "Name": "Aug - Sep (7pm)",
-  "StartTime": 420,
-  "EndTime": 480,
-  "Interval": 60,
-  "Capacity": 1,
-  "Cost": 7.0,
-  "CourtCost": 7.0,
-  "LightingCost": 0.0
-}
-```
-
-**Key Fields:**
-- `ID`: Unique identifier for the session
-- `Category`: Session category (see below)
-- `Name`: Session description
-- `StartTime`: Start time in minutes since midnight (420 = 7:00 AM)
-- `EndTime`: End time in minutes since midnight (480 = 8:00 AM)
-- `Interval`: Booking interval in minutes
-- `Capacity`: Number of available slots (0 = fully booked, ≥1 = available)
-- `Cost`: Total cost for booking
-- `CourtCost`: Base court rental cost
-- `LightingCost`: Additional lighting cost (if applicable)
-
-### Session Categories
-
-The `Category` field indicates the session type:
-
-| Category | Description | Bookable? |
-|----------|-------------|-----------|
-| `0` | **Available for booking** | ✅ Yes (if Capacity ≥ 1) |
-| `1000` | **Already booked** | ❌ No (Capacity = 0) |
-| `2000` | **Club program/class** (e.g., lessons, coaching) | ❌ No (Capacity = 0) |
-| `8000` | **Closed** (court unavailable) | ❌ No (Capacity = 0) |
-
-**The script only considers sessions with:**
-- `Category == 0` (Available for booking)
-- `Capacity >= 1` (At least one slot available)
-
-### Example Flow
-
-1. Script loads venue configurations from `venues.json`
-2. For each enabled venue:
-   - Fetches JSON from API using the venue's URL template
-   - Iterates through each `Resource` (court)
-   - For each court, finds the target date in `Days`
-   - Scans all `Sessions` for that date
-   - Identifies available slots where `Category == 0` and `Capacity >= 1`
-   - Converts `StartTime`/`EndTime` from minutes to human-readable format
-3. Compares with previous state (if `NOTIFY_ONLY_ON_CHANGES = True`)
-4. Groups new availability by venue and sends notification
-
-### Time Conversion
-
-Times are stored as minutes since midnight:
-- `420` minutes = 7:00 AM
-- `540` minutes = 9:00 AM
-- `1260` minutes = 9:00 PM
-
-The script's `minutes_to_time()` function converts these to 12-hour format (e.g., "7am", "9pm").
+**Issue**: Getting notified for same slots repeatedly
+- **Solution**: Ensure you're not using `--notify-always` and `config/availability_state.json` is being created/updated
