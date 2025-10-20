@@ -34,4 +34,4 @@ jobs:
             --pushover-user "$PUSHOVER_USER" \
             --pushover-token "$PUSHOVER_TOKEN" \
             --date 2025-10-25
-            --notify-always
+            --notify-alway
