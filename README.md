@@ -220,29 +220,35 @@ New courts available on Friday Sep. 13:
 
 ## State Tracking
 
-When `--notify-always` is NOT used (default behavior), the script tracks availability in `config/availability_state.json`:
+By default (when `--notify-always` is NOT used), the checker persists the last-seen availability so it can notify only on NEW slots.
 
-```json
-{
-  "finsbury_park": {
-    "name": "Finsbury Park",
-    "availability": [
-      "Court 1: 7am, 9pm",
-      "Court 2: 7am, 9pm"
-    ]
-  },
-  "clissold_park": {
-    "name": "Clissold Park",
-    "availability": [
-      "Court 1: 2pm",
-      "Court 2: 2pm, 5pm"
-    ]
-  },
-  "last_checked": "2025-01-15T10:30:45.123456"
-}
+Design choices considered:
+
+- Single global JSON file (`config/availability_state.json`) — simple, backwards-compatible, but harder to use when checking multiple dates independently because every run would overwrite the same file.
+- One file per date (`config/state/availability_state_YYYY-MM-DD.json`) — isolates state per date, safe for concurrent or scheduled checks of different dates, and easy to inspect or rotate.
+- Embedded DB (SQLite) — robust and queryable, but adds complexity and an extra dependency for a small project.
+
+Chosen approach: one file per date in `config/state/`.
+
+Rationale:
+
+- Minimal changes to the existing code and no new dependencies.
+- Clearly separates state for different dates so you can run checks for multiple dates (e.g., today and a future date) without collisions.
+- Keeps a legacy fallback to `config/availability_state.json` when no date is provided, preserving backward compatibility.
+
+Behavior and file locations:
+
+- Per-date state files are written to `config/state/availability_state_YYYY-MM-DD.json` when a `--date` is supplied (or when the checker is invoked programmatically with a date).
+- If no date is supplied and the code calls the legacy path, the checker will read/write `config/availability_state.json`.
+- Each state file contains a map of venue IDs to the last-known availability and a `last_checked` timestamp.
+
+Example per-date file path:
+
+```
+config/state/availability_state_2025-09-13.json
 ```
 
-This file is automatically managed and should not be edited manually.
+This change makes the checker safe to run concurrently for multiple dates (e.g., scheduled checks for today and for a tournament date) and makes it straightforward to inspect historical state for specific dates.
 
 ## Scheduling (Cron/Task Scheduler)
 

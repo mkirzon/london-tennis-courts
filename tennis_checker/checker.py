@@ -104,8 +104,8 @@ class AvailabilityChecker:
             print("No venues enabled. Please check venues.json")
             return {"venues": {}, "notified": False}
 
-        # Load previous state
-        previous_state = self.config.load_state()
+        # Load previous state for this date (supports per-date state files)
+        previous_state = self.config.load_state(date)
 
         # Track results across all venues
         all_results = {}
@@ -187,6 +187,8 @@ class AvailabilityChecker:
 
         # Save current state for next run (only if tracking changes)
         if self.notify_only_on_changes:
+            # Save state scoped to this date so multiple independent date checks
+            # won't overwrite each other.
             self.config.save_state(
                 {
                     **{
@@ -197,7 +199,8 @@ class AvailabilityChecker:
                         for venue_id, data in all_results.items()
                     },
                     "last_checked": datetime.now().isoformat(),
-                }
+                },
+                date,
             )
 
         return {

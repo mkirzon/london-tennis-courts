@@ -21,7 +21,11 @@ class Config:
             self.config_dir = Path(config_dir)
 
         self.venues_file = self.config_dir / "venues.json"
-        self.state_file = self.config_dir / "availability_state.json"
+        # Directory to hold state files. Using a subdirectory avoids cluttering
+        # the main config folder when multiple dates are tracked independently.
+        self.state_dir = self.config_dir / "state"
+        # Backwards-compatible single-file state (used when no date is provided)
+        self.legacy_state_file = self.config_dir / "availability_state.json"
 
     def load_venues(self) -> List[Dict]:
         """Load venue configurations from venues.json."""
@@ -57,24 +61,54 @@ class Config:
 
         return [v for v in all_venues if v["id"] in enabled_venue_ids]
 
-    def load_state(self) -> Dict:
-        """Load the previous availability state from file."""
-        if self.state_file.exists():
-            try:
-                with open(self.state_file, "r") as f:
+    def load_state(self, date: Optional[str] = None) -> Dict:
+        """
+        Load the previous availability state from file.
+
+        Args:
+            date: Optional date string (YYYY-MM-DD). If provided, load the
+                  per-date state file from the `state/` subdirectory. If not
+                  provided, fall back to the legacy single-file state.
+
+        Returns:
+            Parsed JSON dict of the saved state, or empty dict on error.
+        """
+        # If a date is provided, use per-date state file under state/
+        try:
+            if date:
+                state_path = self.state_dir / f"availability_state_{date}.json"
+            else:
+                state_path = self.legacy_state_file
+
+            if state_path.exists():
+                with open(state_path, "r") as f:
                     return json.load(f)
-            except Exception as e:
-                print(f"Warning: Could not load previous state: {e}")
-                return {}
+        except Exception as e:
+            print(f"Warning: Could not load previous state: {e}")
+
         return {}
 
-    def save_state(self, state_data: Dict) -> None:
-        """Save the current availability state to file."""
-        try:
-            # Ensure directory exists
-            self.state_file.parent.mkdir(parents=True, exist_ok=True)
+    def save_state(self, state_data: Dict, date: Optional[str] = None) -> None:
+        """
+        Save the current availability state to file.
 
-            with open(self.state_file, "w") as f:
+        Args:
+            state_data: JSON-serializable dict to write.
+            date: Optional date string (YYYY-MM-DD). If provided, save to a
+                  per-date file under the `state/` subdirectory. If not
+                  provided, save to the legacy single-file state.
+        """
+        try:
+            if date:
+                # Ensure state directory exists
+                self.state_dir.mkdir(parents=True, exist_ok=True)
+                state_path = self.state_dir / f"availability_state_{date}.json"
+            else:
+                # Ensure config directory exists for legacy file
+                self.legacy_state_file.parent.mkdir(parents=True, exist_ok=True)
+                state_path = self.legacy_state_file
+
+            with open(state_path, "w") as f:
                 json.dump(state_data, f, indent=2)
         except Exception as e:
             print(f"Warning: Could not save state: {e}")
