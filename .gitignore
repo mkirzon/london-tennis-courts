@@ -35,6 +35,7 @@ env/
 
 # State files
 config/availability_state.json
+config/state/*.json
 
 # OS
 .DS_Store
