@@ -279,6 +279,38 @@ venv\Scripts\python.exe check_availability.py
 
 Then schedule it in Task Scheduler.
 
+### MacOS (launchd)
+
+This project uses macOS launchd instead of cron for scheduled runs. A few key points from setup and troubleshooting:
+
+* Script location matters: launchd jobs run in a restricted environment. Avoid placing scripts in `~/Desktop` or other protected folders — use a neutral path like `~/Scripts/tennis-availability-checker.`
+
+* Python and virtual environments: launchd jobs have a minimal `PATH`, so calling `python` directly may fail. Always use the full path to the Python binary inside the virtual environment, e.g.:
+
+  ```
+  /Users/mkirzon/Scripts/tennis-availability-checker/venv/bin/python check_availability.py --date "$DATE"
+  ```
+
+* Logging: All output (stdout + stderr) should be redirected to a log file for debugging, e.g.:
+  ```
+  >> /tmp/tennis_check.log 2>&1
+  ```
+
+* Reloading after edits: After modifying the `.plist` LaunchAgent file, run:
+  ```
+  launchctl unload ~/Library/LaunchAgents/com.mkirzon.tennischecker.plist
+  launchctl load ~/Library/LaunchAgents/com.mkirzon.tennischecker.plist
+  ```
+  And confirm it's loaded with:
+  ```
+  launchctl list | grep tennis
+  ```
+
+* Debugging tips:
+  - Use `launchctl start com.mkirzon.tennischecker` to trigger a manual run.
+
+Following these steps ensures that the script runs reliably every 15 minutes via launchd, using the virtual environment Python, and logs any errors for easy troubleshooting.
+
 ## Development
 
 ### Running Tests
