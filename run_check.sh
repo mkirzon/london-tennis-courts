@@ -6,6 +6,10 @@
 # Set PATH so launchd can find python
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
+# Export Pushover credentials for notifications
+export PUSHOVER_USER="u6swfpe91tfxz718f6dx91m1tikdi6"
+export PUSHOVER_TOKEN="a7zimuio4jfzpj7yw5cbq5av3bbau3"
+
 # Set log file
 LOG_FILE="/tmp/tennis_check.log"
 
