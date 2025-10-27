@@ -24,8 +24,9 @@ def main():
     parser.add_argument(
         "--date",
         type=str,
-        default=datetime.now().strftime("%Y-%m-%d"),
-        help="Date to check (YYYY-MM-DD format). Defaults to today.",
+        nargs="+",
+        default=[datetime.now().strftime("%Y-%m-%d")],
+        help="Date(s) to check (YYYY-MM-DD format). Can specify multiple dates. Defaults to today.",
     )
     parser.add_argument(
         "--venues",
@@ -74,15 +75,22 @@ def main():
         notify_only_on_changes=not args.notify_always,
     )
 
-    # Check availability
-    formatted_date = format_date(args.date)
-    print(f"Checking availability for {formatted_date}...")
-    result = checker.check_all_venues(date=args.date, enabled_venue_ids=args.venues)
+    # Check availability for each date
+    any_notified = False
+    any_available = False
+    
+    for date in args.date:
+        formatted_date = format_date(date)
+        print(f"Checking availability for {formatted_date}...")
+        result = checker.check_all_venues(date=date, enabled_venue_ids=args.venues)
+        
+        if result["notified"]:
+            any_notified = True
+        if any(v["availability"] for v in result["venues"].values()):
+            any_available = True
 
     # Exit with appropriate code
-    if result["notified"]:
-        return 0
-    elif any(v["availability"] for v in result["venues"].values()):
+    if any_notified or any_available:
         return 0
     else:
         return 1

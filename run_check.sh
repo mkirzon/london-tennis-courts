@@ -13,9 +13,10 @@ export PUSHOVER_TOKEN="a7zimuio4jfzpj7yw5cbq5av3bbau3"
 # Set log file
 LOG_FILE="/tmp/tennis_check.log"
 
-# Date to check and expiration date
-DATE="2025-10-25"
-EXPIRATION_DATE=$DATE
+# Date(s) to check (space-separated for multiple dates)
+DATES="2025-11-01 2025-11-02"
+# Set expiration date to the latest date in DATES
+EXPIRATION_DATE="2025-11-02"
 
 # Project directory
 PROJECT_DIR="/Users/mkirzon/Scripts/tennis-availability-checker"
@@ -44,8 +45,8 @@ PROJECT_DIR="/Users/mkirzon/Scripts/tennis-availability-checker"
   fi
 
   # Run the Python script
-  echo "$(date): Running check_availability.py for $DATE..."
-  /Users/mkirzon/Scripts/tennis-availability-checker/venv/bin/python check_availability.py --date "$DATE"
+  echo "$(date): Running check_availability.py for dates: $DATES"
+  /Users/mkirzon/Scripts/tennis-availability-checker/venv/bin/python check_availability.py --date $DATES
 
   echo "$(date): Finished run successfully."
 
